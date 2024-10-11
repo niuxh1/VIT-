@@ -48,7 +48,7 @@ class PatchEmbed(nn.Module):
         flatten: (x,768,14,14) -> (x,768,196)
         transpose: (x,768,196) -> (x,196,768)
         '''
-        x.cnn(x).flatrten(2).transpose(1, 2)
+        x=self.cnn(x).flatten(2).transpose(1, 2)
         '''
         将3通道特征转换为embed_dim个特征，每个特征提取一个网格即14*13个像素
         展平，方便后续处理，
@@ -303,6 +303,7 @@ class VisionTransformer(nn.Module):
         '''
         记录特征维度
         '''
+
         self.num_tokens = 1
         '''
         特殊token
@@ -331,6 +332,8 @@ class VisionTransformer(nn.Module):
         定义嵌入位置，保证时间与逻辑有序
         pos_embed=(1,14*14+1,768)
         '''
+        self.pos_drop = nn.Dropout(p=drop_ratio)
+
         self.blocks = nn.Sequential(*[
             Block(dim=embed_dim,
                   num_heads=num_heads,
@@ -383,47 +386,47 @@ class VisionTransformer(nn.Module):
         引入自定义函数初始化权重
         '''
 
-        def forward(self, x):
-            '''
-            开始前向传播
-            '''
-            x = self.patch_embed(x)
-            '''
-            数据预处理为patch
-            方便后续处理
-            '''
-            cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)
-            '''
-            记录全局特征
-            '''
-            x = torch.cat((cls_tokens, x), dim=1)
-            '''
-            拼接全局特征与输入特征，同时考虑类别与图像块
-            '''
-            x = self.dropout(x + self.pos_embed)
-            '''
-            拼接位置信息保证时间与逻辑有序，
-            随机丢失神经元，防止过拟合
-            '''
-            x = self.blocks(x)
-            '''
-            进入自注意力层，开始提取特征
-            '''
-            x = self.norm(x)
-            '''
-            防止梯度爆炸
-            '''
-            x = self.pre_logits(x[:, 0])
-            '''
-            开始预表达
-            从每个x提取第一个token,即类别token,
-            方便后续分类
-            '''
-            x = self.head(x)
-            '''
-            分类完成
-            '''
-            return x
+    def forward(self, x):
+        '''
+        开始前向传播
+        '''
+        x = self.patch_embed(x)
+        '''
+        数据预处理为patch
+        方便后续处理
+        '''
+        cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)
+        '''
+        记录全局特征
+        '''
+        x = torch.cat((cls_tokens, x), dim=1)
+        '''
+        拼接全局特征与输入特征，同时考虑类别与图像块
+        '''
+        x = self.pos_drop(x + self.pos_embed)
+        '''
+        拼接位置信息保证时间与逻辑有序，
+        随机丢失神经元，防止过拟合
+        '''
+        x = self.blocks(x)
+        '''
+        进入自注意力层，开始提取特征
+        '''
+        x = self.norm(x)
+        '''
+        防止梯度爆炸
+        '''
+        x = self.pre_logits(x[:, 0])
+        '''
+        开始预表达
+        从每个x提取第一个token,即类别token,
+        方便后续分类
+        '''
+        x = self.head(x)
+        '''
+        分类完成
+        '''
+        return x
 
 
 if __name__ == '__main__':
