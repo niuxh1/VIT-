@@ -11,15 +11,18 @@ class MyDataSet(Dataset):
         self.images_class = images_class
         self.transform = transform
 
+        # 创建类名称到索引的映射
+        self.class_to_idx = {cls: idx for idx, cls in enumerate(set(images_class))}
+
     def __len__(self):
         return len(self.images_path)
 
     def __getitem__(self, item):
         img = Image.open(self.images_path[item])
-        # RGB为彩色图片，L为灰度图片
         if img.mode != 'RGB':
             raise ValueError("image: {} isn't RGB mode.".format(self.images_path[item]))
-        label = self.images_class[item]
+
+        label = self.class_to_idx[self.images_class[item]]  # 获取整数标签
 
         if self.transform is not None:
             img = self.transform(img)
@@ -29,7 +32,6 @@ class MyDataSet(Dataset):
     @staticmethod
     def collate_fn(batch):
         images, labels = tuple(zip(*batch))
-
         images = torch.stack(images, dim=0)
-        labels = torch.as_tensor(labels)
+        labels = torch.tensor(labels)  # 确保标签是张量
         return images, labels
